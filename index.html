@@ -1,0 +1,1642 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NGVMS — Replica</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --green:#2f9d3a;
+      --dark:#111827;
+      --muted:#6b7280;
+      --card:#f3f4f6;
+      --panel:#e9e9ea;
+      --accent:#16a34a;
+      --bg:#f4f4f5;
+    }
+    *{box-sizing:border-box}
+    body{font-family:Inter, system-ui, -apple-system, Arial; margin:0; background:var(--bg); color:var(--dark);}
+
+    /* Top bar */
+    .topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 36px;background:#fff;border-bottom:1px solid #efefef}
+    .brand{display:flex;align-items:center;gap:14px}
+    .brand img{width:190px;height:auto;}
+    nav.topnav{display:flex;gap:22px;align-items:center; margin-right: auto;}
+    nav.topnav a{color:var(--dark);text-decoration:none;font-weight:600; font-size: 18px; cursor: pointer;}
+    .profile{display:flex;align-items:center;gap:12px}
+    .profile .avatar{width:44px;height:44px;border-radius:50%;background:#ddd;display:flex;align-items:center;justify-content:center; overflow: hidden;}
+    .profile .avatar img {width:100%;height:100%;object-fit:cover;}
+
+    /* Sidebar Navigation - Hidden by default */
+    .sidebar {
+      width: 260px;
+      background: transparent;
+      transition: transform 0.3s ease;
+      transform: translateX(-100%);
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 20px;
+      background: #fff;
+      box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    }
+    
+    .sidebar.active {
+      transform: translateX(0);
+    }
+    
+    .sidebar .panel {
+      background: #fff;
+      padding: 18px;
+      border-radius: 8px;
+      box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+    }
+    
+    /* Layout */
+    .layout{display:flex;gap:24px;padding:28px 48px}
+    .main{flex:1; margin-left: 0; transition: margin-left 0.3s ease;}
+    
+    /* When sidebar is active, shift main content */
+    .sidebar.active ~ .layout .main {
+      margin-left: 260px;
+    }
+
+    .menu{margin-top:26px}
+    .menu a{display:flex;align-items:center;padding:12px;border-radius:8px;color:#111827;text-decoration:none;margin-bottom:6px;transition:all 0.3s ease;cursor:pointer}
+    .menu a .icon{width:36px;height:36px;border-radius:8px;background:#f3f4f6;display:inline-flex;align-items:center;justify-content:center;margin-right:12px;transition:all 0.3s ease; font-size: 16px;}
+    .menu a.active{background:linear-gradient(90deg,#f0fcf4,#f6fff8);border-left:4px solid var(--green);transform:translateX(5px)}
+    .menu a.active .icon{background:var(--green);color:white}
+    .menu a:hover{background:linear-gradient(90deg,#f0fcf4,#f6fff8);transform:translateX(3px)}
+    .menu a:hover .icon{background:var(--green);color:white}
+
+    /* Data Management Dropdown */
+    .dropdown-content {
+      display: none;
+      margin-left: 48px;
+      margin-top: 8px;
+      margin-bottom: 8px;
+    }
+    .dropdown-content a {
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .dropdown-content a .icon {
+      width: 28px;
+      height: 28px;
+      margin-right: 10px;
+      font-size: 14px;
+    }
+    .dropdown.active .dropdown-content {
+      display: block;
+    }
+    .dropdown-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .dropdown-toggle::after {
+      content: "▼";
+      font-size: 10px;
+      transition: transform 0.3s ease;
+    }
+    .dropdown.active .dropdown-toggle::after {
+      transform: rotate(180deg);
+    }
+
+    /* Main content */
+    .dashboard-title{font-size:24px;font-weight:700;margin-bottom:20px;color:var(--dark)}
+    .btn{display:inline-block;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:700}
+    .btn.green{background:var(--green);color:#fff;box-shadow:0 8px 18px rgba(47,157,58,0.12)}
+    .btn.ghost{background:#fff;border:1px solid #e6e6e6;color:var(--dark)}
+
+    /* Cards with icons - Made narrower */
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:26px}
+    .card{background:#fff;padding:18px;border-radius:10px;box-shadow:0 6px 18px rgba(15,23,42,0.03);min-height:120px;transition:transform 0.3s ease, box-shadow 0.3s ease; position: relative;}
+    .card:hover{transform:translateY(-5px);box-shadow:0 10px 25px rgba(15,23,42,0.1)}
+    .card .title{font-size:14px;color:#111827;background:#fff;padding:8px;border-radius:6px;display:inline-block}
+    .card .number{font-size:28px;font-weight:800;margin-top:12px}
+    .card .muted{color:var(--muted);font-size:12px;margin-top:8px}
+    .card-icon{position:absolute;top:18px;right:18px;width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+
+    /* Dashboard tiles area - Made narrower */
+    .dashboard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:14px}
+    
+    /* Enhanced Filter Dropdowns */
+    .filter-container {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    
+    .nested-filter-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .nested-filter-select {
+      padding: 10px 15px;
+      border: 1px solid #e6e6e6;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      font-weight: 500;
+      width: 180px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .nested-filter-select::after {
+      content: "▼";
+      font-size: 10px;
+      transition: transform 0.3s ease;
+    }
+    
+    .nested-filter-dropdown.active .nested-filter-select::after {
+      transform: rotate(180deg);
+    }
+    
+    .nested-filter-options {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      width: 100%;
+      background: #fff;
+      border: 1px solid #e6e6e6;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 10;
+    }
+    
+    .nested-filter-dropdown.active .nested-filter-options {
+      display: block;
+    }
+    
+    .nested-filter-option {
+      padding: 10px 15px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+    
+    .nested-filter-option:hover {
+      background: #f3f4f6;
+    }
+    
+    .nested-filter-option.active {
+      background: var(--green);
+      color: white;
+    }
+    
+    /* Emission Calculator Styles */
+    .emission-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    
+    .emission-stats {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 6px 18px rgba(15,23,42,0.03);
+    }
+    
+    .emission-main-stat {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--green);
+      margin-bottom: 10px;
+    }
+    
+    .emission-date-range {
+      color: var(--muted);
+      font-size: 14px;
+    }
+    
+    .emission-actions {
+      display: flex;
+      gap: 10px;
+    }
+    
+    /* Enhanced Cards for Emission Calculator with Doughnut Charts */
+    .emission-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 18px;
+      margin-top: 20px;
+    }
+    
+    .emission-card {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(15,23,42,0.03);
+      position: relative;
+    }
+    
+    .emission-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .emission-card-title {
+      font-weight: 700;
+      font-size: 16px;
+    }
+    
+    .co2-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  pointer-events: none;
+}
+
+    .emission-card-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+    }
+    
+    .emission-card-chart {
+      width: 100px;
+      height: 100px;
+      position: relative;
+    }
+    
+    .emission-card-co2 {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    
+    .emission-card-co2-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--green);
+    }
+    
+    .emission-card-co2-label {
+      font-size: 14px;
+      color: var(--muted);
+    }
+    
+    .emission-card-stats {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    
+    .emission-card-stat {
+      text-align: center;
+    }
+    
+    .emission-card-stat-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--green);
+    }
+    
+    .emission-card-stat-label {
+      font-size: 12px;
+      color: var(--muted);
+    }
+    
+    .emission-card-progress {
+      height: 6px;
+      background: #f3f4f6;
+      border-radius: 3px;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+    
+    .emission-card-progress-bar {
+      height: 100%;
+      background: var(--green);
+      border-radius: 3px;
+    }
+    
+    .emission-card-footer {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+    
+    .co2-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+  pointer-events: none;
+}
+
+    /* Enhanced Table Styles */
+    .table-container {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 20px;
+      box-shadow: 0 6px 18px rgba(15,23,42,0.03);
+    }
+    
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .table-title {
+      font-weight: 700;
+      font-size: 18px;
+    }
+    
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    
+    .data-table th, .data-table td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #e6e6e6;
+    }
+    
+    .data-table th {
+      background: #f9fafb;
+      font-weight: 600;
+      color: var(--dark);
+    }
+    
+    .data-table tr:last-child td {
+      border-bottom: none;
+    }
+    
+    .data-table tr:hover {
+      background: #f9fafb;
+    }
+    
+    .status-badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    
+    .status-completed {
+      background: #f0fdf4;
+      color: #16a34a;
+    }
+    
+    .status-in-progress {
+      background: #fef3c7;
+      color: #d97706;
+    }
+    
+    /* Action buttons */
+    .action-btn {
+      padding: 6px 12px;
+      border-radius: 4px;
+      background: #f3f4f6;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      margin-right: 5px;
+    }
+    
+    .action-btn.edit {
+      background: #e0f2fe;
+      color: #0369a1;
+    }
+    
+    .action-btn.delete {
+      background: #fee2e2;
+      color: #dc2626;
+    }
+    
+    /* Search and create section */
+    .search-create {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      align-items: center;
+    }
+    
+    .search-box {
+      padding: 10px 15px;
+      border: 1px solid #e6e6e6;
+      border-radius: 6px;
+      width: 300px;
+    }
+    
+    .create-btn {
+      background: var(--green);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    
+    @media(max-width:1100px){.dashboard-grid{grid-template-columns:repeat(3,1fr)}}
+    
+    @media(max-width:760px){
+      .layout{flex-direction:column;padding:18px} 
+      .dashboard-grid{grid-template-columns:repeat(2,1fr)}
+      .sidebar.active ~ .layout .main {
+        margin-left: 0;
+      }
+      .search-create {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+      }
+      .search-box {
+        width: 100%;
+      }
+      .emission-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+      }
+      .emission-actions {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .filter-container {
+        flex-direction: column;
+      }
+      .nested-filter-select {
+        width: 100%;
+      }
+    }
+
+    /* Tab content */
+    .tab-content{display:none}
+    .tab-content.active{display:block}
+
+    /* Small helpers */
+    .right-illustration{max-width:340px}
+    footer{padding:18px 48px;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <!-- Sidebar Navigation - Hidden by default -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand" style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #efefef;">
+      <img src="logo.png" alt="NGVMS">
+    </div>
+    
+    <div class="panel">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:10px;height:48px;background:linear-gradient(180deg,var(--green),#008751);border-radius:6px"></div>
+        <div>
+          <div style="font-weight:800;font-size:18px">Dashboard Overview</div>
+          <div style="font-size:12px;color:var(--muted)">Overview & stats</div>
+        </div>
+      </div>
+
+      <nav class="menu">
+        <a class="active" data-tab="dashboard"><span class="icon"><i class="fas fa-chart-pie"></i></span> Dashboard Overview</a>
+        
+        <!-- Data Management with dropdown -->
+        <div class="dropdown" id="data-management-dropdown">
+          <a class="dropdown-toggle" data-tab="data-management"><span class="icon"><i class="fas fa-database"></i></span> Data Management</a>
+          <div class="dropdown-content">
+            <a data-tab="son"><span class="icon"><i class="fas fa-file-alt"></i></span> SON</a>
+            <a data-tab="naddc"><span class="icon"><i class="fas fa-building"></i></span> NADDC</a>
+            <a data-tab="naddc-conversion-centers"><span class="icon"><i class="fas fa-tools"></i></span> NADDC Conversion centers</a>
+            <a data-tab="cip-conversion-centers"><span class="icon"><i class="fas fa-industry"></i></span> CIP Conversion centers</a>
+            <a data-tab="frsc"><span class="icon"><i class="fas fa-car"></i></span> FRSC</a>
+            <a data-tab="nmdpra"><span class="icon"><i class="fas fa-gas-pump"></i></span> NMDPRA</a>
+            <a data-tab="dealers"><span class="icon"><i class="fas fa-store"></i></span> Dealers</a>
+          </div>
+        </div>
+        
+        <a data-tab="conversion-centers"><span class="icon"><i class="fas fa-tools"></i></span> Manage Conversion Centers conversions</a>
+        <a data-tab="pumpers"><span class="icon"><i class="fas fa-gas-pump"></i></span> Manage Pumpers</a>
+        <a data-tab="pump-sales"><span class="icon"><i class="fas fa-receipt"></i></span> Manage Pump Sales</a>
+        <a data-tab="user-management"><span class="icon"><i class="fas fa-users"></i></span> User Management</a>
+        <a data-tab="emission-calculator"><span class="icon"><i class="fas fa-leaf"></i></span> Emission Calculator</a>
+        <a data-tab="system-settings"><span class="icon"><i class="fas fa-cog"></i></span> System Settings</a>
+        <a data-tab="user-dashboard"><span class="icon"><i class="fas fa-tachometer-alt"></i></span> User Dashboard</a>
+      </nav>
+    </div>
+  </aside>
+
+  <header class="topbar">
+    <nav class="topnav">
+      <a href="#" id="navToggle"><i class="fas fa-bars"></i></a>
+    </nav>
+    
+    <!-- Removed the brand logo from topbar -->
+    <div class="brand" style="visibility: hidden;">
+      <img src="logo.png" alt="NGVMS">
+    </div>
+
+    <div class="profile">
+      <div style="position:relative">
+        <div style="width:10px;height:10px;background:#16a34a;border-radius:50%;position:absolute;right:0;top:0;box-shadow:0 0 0 3px rgba(22,163,74,0.06)"></div>
+        <div class="avatar">
+          <!-- Replace with your local image path -->
+          <img src="profile.jpg" alt="Super Admin">
+        </div>
+      </div>
+      <div>
+        <div style="font-weight:700">Super Admin</div>
+        <div style="font-size:12px;color:var(--muted)">Admin</div>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <main class="main">
+      <!-- Dashboard Tab Content -->
+      <div id="dashboard" class="tab-content active">
+        <div class="dashboard-title">Dashboard</div>
+
+        <section class="cards" aria-label="quick-stats">
+          <div class="card">
+            <div class="card-icon" style="background-color: rgba(47, 157, 58, 0.1); color: var(--green);">
+              <i class="fas fa-users"></i>
+            </div>
+            <div class="title">Total Users</div>
+            <div class="number">0</div>
+            <div class="muted">0% up from yesterday</div>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background-color: rgba(47, 157, 58, 0.1); color: var(--green);">
+              <i class="fas fa-user-check"></i>
+            </div>
+            <div class="title">Verified Users</div>
+            <div class="number">0</div>
+            <div class="muted">0% up from past week</div>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background-color: rgba(47, 157, 58, 0.1); color: var(--green);">
+              <i class="fas fa-building"></i>
+            </div>
+            <div class="title">NADDC (Accredited Conversion Centres)</div>
+            <div class="number">0</div>
+            <div class="muted">0% up from yesterday</div>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background-color: rgba(47, 157, 58, 0.1); color: var(--green);">
+              <i class="fas fa-industry"></i>
+            </div>
+            <div class="title">CIP Conversion Centers</div>
+            <div class="number">0</div>
+            <div class="muted">0% up from yesterday</div>
+          </div>
+          <div class="card">
+            <div class="card-icon" style="background-color: rgba(47, 157, 58, 0.1); color: var(--green);">
+              <i class="fas fa-clock"></i>
+            </div>
+            <div class="title">Total Pending</div>
+            <div class="number">0</div>
+            <div class="muted">0% up from yesterday</div>
+          </div>
+        </section>
+
+        <section style="margin-top:18px">
+          <div class="dashboard-grid">
+            <div class="card">
+              <div class="card-icon" style="background-color: rgba(47, 157, 58, 0.1); color: var(--green);">
+                <i class="fas fa-certificate"></i>
+              </div>
+              <div class="title">SON Certified CNG Conversion Kit Supplier</div>
+              <div class="number">0</div>
+              <div class="muted">0% up from yesterday</div>
+            </div>
+            <div class="card">
+              <div class="card-icon" style="background-color: rgba(47, 157, 58, 0.1); color: var(--green);">
+                <i class="fas fa-car"></i>
+              </div>
+              <div class="title">Registered Vehicles</div>
+              <div class="number">0</div>
+              <div class="muted">0% up from yesterday</div>
+            </div>
+            <div class="card">
+              <div class="card-icon" style="background-color: rgba(47, 157, 58, 0.1); color: var(--green);">
+                <i class="fas fa-gas-pump"></i>
+              </div>
+              <div class="title">NMDPRA (Licensed CNG Filling Station)</div>
+              <div class="number">0</div>
+              <div class="muted">0% up from past week</div>
+            </div>
+            <div class="card">
+              <div class="card-icon" style="background-color: rgba(47, 157, 58, 0.1); color: var(--green);">
+                <i class="fas fa-hand-holding-usd"></i>
+              </div>
+              <div class="title">Financial Service Providers</div>
+              <div class="number">0</div>
+              <div class="muted">0% up from yesterday</div>
+            </div>
+            <div class="card">
+              <div class="card-icon" style="background-color: rgba(47, 157, 58, 0.1); color: var(--green);">
+                <i class="fas fa-id-card"></i>
+              </div>
+              <div class="title">FRSC Vehicle Registration Verification</div>
+              <div class="number">0</div>
+              <div class="muted">0% up from yesterday</div>
+            </div>
+            <div class="card">
+              <div class="card-icon" style="background-color: rgba(47, 157, 58, 0.1); color: var(--green);">
+                <i class="fas fa-exchange-alt"></i>
+              </div>
+              <div class="title">Conversions</div>
+              <div class="number">0</div>
+              <div class="muted">0% up from yesterday</div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Data Management Tab Content -->
+      <div id="data-management" class="tab-content">
+        <div class="dashboard-title">Data Management</div>
+        <div style="background:#fff;padding:20px;border-radius:10px;box-shadow:0 6px 18px rgba(15,23,42,0.03);">
+          <p>Data Management content will be displayed here.</p>
+        </div>
+      </div>
+
+      <!-- SON Tab Content -->
+      <div id="son" class="tab-content">
+        <div class="dashboard-title">SON</div>
+        <div class="search-create">
+          <input type="text" class="search-box" placeholder="Search...">
+          <button class="create-btn">CREATE NEW</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>S/N</th>
+              <th>Kft Serial Number</th>
+              <th>Manufacturer</th>
+              <th>Added On</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>65432456787654</td>
+              <td>Valex</td>
+              <td>17/07/2025</td>
+              <td>Active</td>
+              <td>
+                <button class="action-btn edit">Edit</button>
+                <button class="action-btn delete">Delete</button>
+              </td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>400500505</td>
+              <td>Name</td>
+              <td>17/07/2025</td>
+              <td>Active</td>
+              <td>
+                <button class="action-btn edit">Edit</button>
+                <button class="action-btn delete">Delete</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- NADDC Tab Content -->
+      <div id="naddc" class="tab-content">
+        <div class="dashboard-title">NADDC</div>
+        <div class="search-create">
+          <input type="text" class="search-box" placeholder="Search...">
+          <button class="create-btn">CREATE NEW</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>S/N</th>
+              <th>Name</th>
+              <th>License Number</th>
+              <th>Added On</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>Maurice Abgan</td>
+              <td>89237836</td>
+              <td>15/07/2025</td>
+              <td>Active</td>
+              <td>
+                <button class="action-btn edit">Edit</button>
+                <button class="action-btn delete">Delete</button>
+              </td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>Atlas Core Energy and Logistic Ltd</td>
+              <td>32143863</td>
+              <td>22/07/2025</td>
+              <td>Active</td>
+              <td>
+                <button class="action-btn edit">Edit</button>
+                <button class="action-btn delete">Delete</button>
+              </td>
+            </tr>
+            <!-- Additional rows would go here -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- NADDC Conversion Centers Tab Content -->
+      <div id="naddc-conversion-centers" class="tab-content">
+        <div class="dashboard-title">NADDC Conversion Centers</div>
+        <div class="search-create">
+          <input type="text" class="search-box" placeholder="Search...">
+          <button class="create-btn">CREATE NEW</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>State</th>
+              <th>LGA</th>
+              <th>License Number</th>
+              <th>Address</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Maurice Abpan</td>
+              <td>-</td>
+              <td>-</td>
+              <td>89237836</td>
+              <td>3b. secretariat road</td>
+            </tr>
+            <tr>
+              <td>Atlas Core Energy and Logistic Ltd</td>
+              <td>-</td>
+              <td>-</td>
+              <td>32143863</td>
+              <td>Radan South-West, Oyo</td>
+            </tr>
+            <!-- Additional rows would go here -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- CIP Conversion Centers Tab Content -->
+      <div id="cip-conversion-centers" class="tab-content">
+        <div class="dashboard-title">CIP Conversion Centers</div>
+        <div class="search-create">
+          <input type="text" class="search-box" placeholder="Search...">
+          <button class="create-btn">CREATE NEW</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>State</th>
+              <th>LGA</th>
+              <th>Code</th>
+              <th>Address</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Loading...</td>
+              <td>Loading...</td>
+              <td>Loading...</td>
+              <td>Loading...</td>
+              <td>Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- FRSC Tab Content -->
+      <div id="frsc" class="tab-content">
+        <div class="dashboard-title">FRSC</div>
+        <div class="search-create">
+          <input type="text" class="search-box" placeholder="Search...">
+          <button class="create-btn">CREATE NEW</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>S/N</th>
+              <th>Registration Number</th>
+              <th>Color</th>
+              <th>Weight (KG)</th>
+              <th>Added On</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>ABI 49 DA</td>
+              <td>Black</td>
+              <td>144</td>
+              <td>15/07/2025</td>
+              <td>Active</td>
+              <td>
+                <button class="action-btn edit">Edit</button>
+                <button class="action-btn delete">Delete</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- NMDPRA Tab Content -->
+      <div id="nmdpra" class="tab-content">
+        <div class="dashboard-title">NMDPRA</div>
+        <div class="search-create">
+          <input type="text" class="search-box" placeholder="Search...">
+          <button class="create-btn">CREATE NEW</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>S/N</th>
+              <th>License Number</th>
+              <th>LGA</th>
+              <th>State</th>
+              <th>Added On</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>00:00:00</td>
+              <td>Demsa</td>
+              <td>Adamawa</td>
+              <td>17/07/2025</td>
+              <td>Active</td>
+              <td>
+                <button class="action-btn edit">Edit</button>
+                <button class="action-btn delete">Delete</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Dealers Tab Content -->
+      <div id="dealers" class="tab-content">
+        <div class="dashboard-title">Dealers</div>
+        <div class="search-create">
+          <input type="text" class="search-box" placeholder="Search...">
+          <button class="create-btn">CREATE NEW</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>S/N</th>
+              <th>Name</th>
+              <th>Serial Number</th>
+              <th>Added On</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>Maurice Abpan</td>
+              <td>2309235895788</td>
+              <td>15/07/2025</td>
+              <td>Active</td>
+              <td>
+                <button class="action-btn edit">Edit</button>
+                <button class="action-btn delete">Delete</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Conversion Centers Tab Content -->
+      <div id="conversion-centers" class="tab-content">
+        <div class="dashboard-title">Manage Conversion Centers</div>
+        <div class="search-create">
+          <input type="text" class="search-box" placeholder="Search...">
+          <button class="create-btn">CREATE NEW</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Owner's name</th>
+              <th>NIN</th>
+              <th>Phone number</th>
+              <th>VIN/Chassis number</th>
+              <th>K2 serial number</th>
+              <th>Engine size</th>
+              <th>Vehicle registration number</th>
+              <th>Vehicle model</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Abraham Isah</td>
+              <td>566855613</td>
+              <td>08010030211</td>
+              <td>10342266pf133</td>
+              <td>322455</td>
+              <td>119</td>
+              <td>ABI 49 DA</td>
+              <td>2024</td>
+            </tr>
+            <!-- Additional rows would go here -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pumpers Tab Content -->
+      <div id="pumpers" class="tab-content">
+        <div class="dashboard-title">Manage Pumpers</div>
+        <div class="search-create">
+          <input type="text" class="search-box" placeholder="Search...">
+          <button class="create-btn">CREATE NEW</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Pumpers name</th>
+              <th>Phone number</th>
+              <th>NIN</th>
+              <th>Email</th>
+              <th>Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>GUNJI SHELTER</td>
+              <td>07035594053</td>
+              <td>-</td>
+              <td>hopegunui@gmail.com</td>
+              <td>July 17, 2025</td>
+              <td>
+                <button class="action-btn edit">Edit</button>
+                <button class="action-btn delete">Delete</button>
+              </td>
+            </tr>
+            <tr>
+              <td>Pump</td>
+              <td>081004040403</td>
+              <td>-</td>
+              <td>pumper@gmail.com</td>
+              <td>July 18, 2025</td>
+              <td>
+                <button class="action-btn edit">Edit</button>
+                <button class="action-btn delete">Delete</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pump Sales Tab Content -->
+      <div id="pump-sales" class="tab-content">
+        <div class="dashboard-title">Manage Pump Sales</div>
+        <div class="search-create">
+          <input type="text" class="search-box" placeholder="Search...">
+          <button class="create-btn">CREATE NEW</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Amount</th>
+              <th>Quantity</th>
+              <th>Pumpers Name</th>
+              <th>Pumpers Email</th>
+              <th>Pumpers Phone</th>
+              <th>Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="7" style="text-align: center;">No data available</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- User Management Tab Content -->
+      <div id="user-management" class="tab-content">
+        <div class="dashboard-title">User Management</div>
+        <div class="search-create">
+          <input type="text" class="search-box" placeholder="Search...">
+          <button class="create-btn">CREATE NEW</button>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>S/N</th>
+              <th>Info</th>
+              <th>Type</th>
+              <th>Added On</th>
+              <th>Verified</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td>
+              <td>Taiwo Hassan (haywo247@gmail.com)</td>
+              <td>Noddc</td>
+              <td>18/07/2025</td>
+              <td>No</td>
+              <td>
+                <button class="action-btn edit">Edit</button>
+                <button class="action-btn delete">Delete</button>
+              </td>
+            </tr>
+            <!-- Additional rows would go here -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Emission Calculator Tab Content -->
+      <div id="emission-calculator" class="tab-content">
+        <div class="dashboard-title">Emission Calculator</div>
+        
+        <!-- Main emission stats -->
+        <div class="emission-stats">
+          <div class="emission-header">
+            <div>
+              <div class="emission-main-stat">0 tCO2e Reduced</div>
+              <div class="emission-date-range">11 – 17 Sep 2024</div>
+            </div>
+            <div class="emission-actions">
+              <!-- Removed Create Project button -->
+              <button class="btn ghost">Export Report</button>
+            </div>
+          </div>
+        </div>
+        
+       <!-- Enhanced Filter Dropdowns -->
+<div class="filter-container">
+
+  <!-- PERIOD -->
+  <div class="nested-filter-dropdown" id="period-filter">
+    <div class="nested-filter-select">daily</div>
+    <div class="nested-filter-options">
+      <div class="nested-filter-option active" data-period="daily">daily</div>
+      <div class="nested-filter-option" data-period="weekly">weekly</div>
+      <div class="nested-filter-option" data-period="monthly">monthly</div>
+      <div class="nested-filter-option" data-period="quarterly">quarterly</div>
+      <div class="nested-filter-option" data-period="yearly">yearly</div>
+    </div>
+  </div>
+
+  <!-- DAY -->
+  <div class="nested-filter-dropdown" id="day-filter">
+    <div class="nested-filter-select">monday</div>
+    <div class="nested-filter-options">
+      <div class="nested-filter-option active" data-day="monday">monday</div>
+      <div class="nested-filter-option" data-day="tuesday">tuesday</div>
+      <div class="nested-filter-option" data-day="wednesday">wednesday</div>
+      <div class="nested-filter-option" data-day="thursday">thursday</div>
+      <div class="nested-filter-option" data-day="friday">friday</div>
+      <div class="nested-filter-option" data-day="saturday">saturday</div>
+      <div class="nested-filter-option" data-day="sunday">sunday</div>
+    </div>
+  </div>
+
+  <!-- WEEK -->
+  <div class="nested-filter-dropdown" id="week-filter">
+    <div class="nested-filter-select">week 1</div>
+    <div class="nested-filter-options">
+      <div class="nested-filter-option active" data-week="1">week 1</div>
+      <div class="nested-filter-option" data-week="2">week 2</div>
+      <div class="nested-filter-option" data-week="3">week 3</div>
+      <div class="nested-filter-option" data-week="4">week 4</div>
+    </div>
+  </div>
+
+  <!-- MONTH -->
+  <div class="nested-filter-dropdown" id="month-filter">
+    <div class="nested-filter-select">september</div>
+    <div class="nested-filter-options">
+      <div class="nested-filter-option" data-month="january">january</div>
+      <div class="nested-filter-option" data-month="february">february</div>
+      <div class="nested-filter-option" data-month="march">march</div>
+      <div class="nested-filter-option" data-month="april">april</div>
+      <div class="nested-filter-option" data-month="may">may</div>
+      <div class="nested-filter-option" data-month="june">june</div>
+      <div class="nested-filter-option" data-month="july">july</div>
+      <div class="nested-filter-option" data-month="august">august</div>
+      <div class="nested-filter-option active" data-month="september">september</div>
+      <div class="nested-filter-option" data-month="october">october</div>
+      <div class="nested-filter-option" data-month="november">november</div>
+      <div class="nested-filter-option" data-month="december">december</div>
+    </div>
+  </div>
+
+  <!-- YEAR -->
+  <div class="nested-filter-dropdown" id="year-filter">
+    <div class="nested-filter-select">2024</div>
+    <div class="nested-filter-options">
+      <div class="nested-filter-option" data-year="2023">2024</div>
+      <div class="nested-filter-option active" data-year="2024">2025</div>
+    </div>
+  </div>
+
+</div>
+
+
+        
+        <!-- Emission Cards with Doughnut Charts -->
+<div class="emission-cards">
+
+  <!-- CNG CARS -->
+  <div class="emission-card">
+    <div class="emission-card-header">
+      <div class="emission-card-title">CNG CARS</div>
+      <div style="font-size: 12px; color: var(--muted);">Active</div>
+    </div>
+    <div class="emission-card-content">
+      <div class="emission-card-chart" style="position: relative;">
+        <canvas id="cngCarsChart"></canvas>
+        <div class="co2-center">0%</div>
+      </div>
+    </div>
+    <div class="emission-card-stats">
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">CO2</div>
+      </div>
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">0h</div>
+        <div class="emission-card-stat-label">Avg. Usage</div>
+      </div>
+    </div>
+    <div class="emission-card-progress">
+      <div class="emission-card-progress-bar" style="width: 0%"></div>
+    </div>
+  </div>
+
+  <!-- CNG TRICYCLES -->
+  <div class="emission-card">
+    <div class="emission-card-header">
+      <div class="emission-card-title">CNG TRICYCLES</div>
+      <div style="font-size: 12px; color: var(--muted);">Active</div>
+    </div>
+    <div class="emission-card-content">
+      <div class="emission-card-chart" style="position: relative;">
+        <canvas id="cngTricyclesChart"></canvas>
+        <div class="co2-center">0%</div>
+      </div>
+    </div>
+    <div class="emission-card-stats">
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">CO2</div>
+      </div>
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">0h</div>
+        <div class="emission-card-stat-label">Avg. Usage</div>
+      </div>
+    </div>
+    <div class="emission-card-progress">
+      <div class="emission-card-progress-bar" style="width: 0%"></div>
+    </div>
+  </div>
+
+  <!-- CNG BIKES -->
+  <div class="emission-card">
+    <div class="emission-card-header">
+      <div class="emission-card-title">CNG BIKES</div>
+      <div style="font-size: 12px; color: var(--muted);">Active</div>
+    </div>
+    <div class="emission-card-content">
+      <div class="emission-card-chart" style="position: relative;">
+        <canvas id="cngBikesChart"></canvas>
+        <div class="co2-center">0%</div>
+      </div>
+    </div>
+    <div class="emission-card-stats">
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">CO2</div>
+      </div>
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">0h</div>
+        <div class="emission-card-stat-label">Avg. Usage</div>
+      </div>
+    </div>
+    <div class="emission-card-progress">
+      <div class="emission-card-progress-bar" style="width: 0%"></div>
+    </div>
+  </div>
+
+  <!-- ELECTRIC TRICYCLES -->
+  <div class="emission-card">
+    <div class="emission-card-header">
+      <div class="emission-card-title">ELECTRIC TRICYCLES</div>
+      <div style="font-size: 12px; color: var(--muted);">Active</div>
+    </div>
+    <div class="emission-card-content">
+      <div class="emission-card-chart" style="position: relative;">
+        <canvas id="electricTricyclesChart"></canvas>
+        <div class="co2-center">0%</div>
+      </div>
+     
+    </div>
+    <div class="emission-card-stats">
+      
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">CO2</div>
+    
+      </div>
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">0h</div>
+        <div class="emission-card-stat-label">Avg. Usage</div>
+      </div>
+    </div>
+    <div class="emission-card-progress">
+      <div class="emission-card-progress-bar" style="width: 0%"></div>
+    </div>
+    
+  </div>
+
+  <!-- ELECTRIC BIKES -->
+  <div class="emission-card">
+    <div class="emission-card-header">
+      <div class="emission-card-title">ELECTRIC BIKES</div>
+      <div style="font-size: 12px; color: var(--muted);">Active</div>
+    </div>
+    <div class="emission-card-content">
+      <div class="emission-card-chart" style="position: relative;">
+        <canvas id="electricBikesChart"></canvas>
+        <div class="co2-center">0%</div>
+      </div>
+      
+    </div>
+    <div class="emission-card-stats">
+      
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">CO2</div>
+       
+      </div>
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">0h</div>
+        <div class="emission-card-stat-label">Avg. Usage</div>
+      </div>
+    </div>
+    <div class="emission-card-progress">
+      <div class="emission-card-progress-bar" style="width: 0%"></div>
+    </div>
+    
+  </div>
+
+  <!-- ELECTRIC CARS -->
+  <div class="emission-card">
+    <div class="emission-card-header">
+      <div class="emission-card-title">ELECTRIC CARS</div>
+      <div style="font-size: 12px; color: var(--muted);">Active</div>
+    </div>
+    <div class="emission-card-content">
+      <div class="emission-card-chart" style="position: relative;">
+        <canvas id="electricCarsChart"></canvas>
+        <div class="co2-center">0%</div>
+      </div>
+      
+    </div>
+    <div class="emission-card-stats">
+     
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">CO2</div>
+        
+      </div>
+      <div class="emission-card-stat">
+        <div class="emission-card-stat-value">0h</div>
+        <div class="emission-card-stat-label">Avg. Usage</div>
+      </div>
+    </div>
+    <div class="emission-card-progress">
+      <div class="emission-card-progress-bar" style="width: 0%"></div>
+    </div>
+    
+  </div>
+
+</div>
+
+        
+        <!-- Enhanced History Table -->
+        <div class="table-container">
+          <div class="table-header">
+            <div class="table-title">Emission Reduction History</div>
+            <div class="filter-container">
+              <div class="nested-filter-dropdown" id="table-period-filter">
+                <div class="nested-filter-select">All Periods</div>
+                <div class="nested-filter-options">
+                  <div class="nested-filter-option active" data-period="all">All Periods</div>
+                  <div class="nested-filter-option" data-period="daily">Daily</div>
+                  <div class="nested-filter-option" data-period="weekly">Weekly</div>
+                  <div class="nested-filter-option" data-period="monthly">Monthly</div>
+                  <div class="nested-filter-option" data-period="quarterly">Quarterly</div>
+                  <div class="nested-filter-option" data-period="yearly">Yearly</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Vehicle Type</th>
+                <th>CO2 Reduced (t)</th>
+                <th>Fuel/Energy Saved</th>
+                <th>Conversion Center</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>14 SEP 2024</td>
+                <td>CNG Car</td>
+                <td>0</td>
+                <td>0 L</td>
+                <td>UCF-EEDSOFT</td>
+                <td><span class="status-badge status-completed">Completed</span></td>
+              </tr>
+              <tr>
+                <td>16 SEP 2024</td>
+                <td>CNG Tricycle</td>
+                <td>0</td>
+                <td>0 L</td>
+                <td>NICHAIP2024</td>
+                <td><span class="status-badge status-completed">Completed</span></td>
+              </tr>
+              <tr>
+                <td>17 SEP 2024</td>
+                <td>Electric Car</td>
+                <td>0</td>
+                <td>0 kWh</td>
+                <td>ELEC-2024-01</td>
+                <td><span class="status-badge status-completed">Completed</span></td>
+              </tr>
+              <tr>
+                <td>18 SEP 2024</td>
+                <td>CNG Bike</td>
+                <td>0</td>
+                <td>0 L</td>
+                <td>BIKE-CNV-05</td>
+                <td><span class="status-badge status-in-progress">In Progress</span></td>
+              </tr>
+              <tr>
+                <td>19 SEP 2024</td>
+                <td>Electric Tricycle</td>
+                <td>0</td>
+                <td>0 kWh</td>
+                <td>TRICYCLE-ELEC-03</td>
+                <td><span class="status-badge status-completed">Completed</span></td>
+              </tr>
+              <tr>
+                <td>20 SEP 2024</td>
+                <td>CNG Car</td>
+                <td>0</td>
+                <td>0 L</td>
+                <td>CAR-CNG-12</td>
+                <td><span class="status-badge status-completed">Completed</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- System Settings Tab Content -->
+      <div id="system-settings" class="tab-content">
+        <div class="dashboard-title">System Settings</div>
+        <div style="background:#fff;padding:20px;border-radius:10px;box-shadow:0 6px 18px rgba(15,23,42,0.03);">
+          <p>System Settings content will be displayed here.</p>
+        </div>
+      </div>
+
+      <!-- User Dashboard Tab Content -->
+      <div id="user-dashboard" class="tab-content">
+        <div class="dashboard-title">User Dashboard</div>
+        <div style="background:#fff;padding:20px;border-radius:10px;box-shadow:0 6px 18px rgba(15,23,42,0.03);">
+          <p>User Dashboard content will be displayed here.</p>
+        </div>
+      </div>
+
+      <footer>© NGVMS 2025. All Rights Reserved.</footer>
+    </main>
+  </div>
+
+  <script>
+document.addEventListener('DOMContentLoaded', function() {
+  // ================= Navigation Toggle =================
+  const navToggle = document.getElementById('navToggle');
+  const sidebar = document.getElementById('sidebar');
+
+  navToggle.addEventListener('click', function(e) {
+    e.preventDefault();
+    sidebar.classList.toggle('active');
+  });
+
+  // ================= Tab Switching =================
+  const menuItems = document.querySelectorAll('.menu a, .dropdown-content a');
+  const tabContents = document.querySelectorAll('.tab-content');
+  const dataManagementDropdown = document.getElementById('data-management-dropdown');
+  const dropdownToggle = dataManagementDropdown.querySelector('.dropdown-toggle');
+
+  dropdownToggle.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    dataManagementDropdown.classList.toggle('active');
+    return false;
+  });
+
+  menuItems.forEach(item => {
+    item.addEventListener('click', function(e) {
+      if (!this.classList.contains('dropdown-toggle')) e.preventDefault();
+      menuItems.forEach(i => i.classList.remove('active'));
+      this.classList.add('active');
+      tabContents.forEach(tab => tab.classList.remove('active'));
+      const tabId = this.getAttribute('data-tab');
+      const activeTab = document.getElementById(tabId);
+      if (activeTab) activeTab.classList.add('active');
+      sidebar.classList.remove('active');
+    });
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.dropdown')) {
+      dataManagementDropdown.classList.remove('active');
+    }
+  });
+
+  // ================= Doughnut Charts =================
+  function initEmissionCharts() {
+    const chartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '70%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false }
+      }
+    };
+
+    const chartsConfig = [
+      { id: 'cngCarsChart', data: [20, 15, 30, 10, 25], colors: ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF','#FF9F40'] },
+      { id: 'cngTricyclesChart', data: [20, 15, 25, 10, 30], colors: ['#FF6384','#36A2EB','#FFCE56','#4BC0C0','#9966FF'] },
+      { id: 'cngBikesChart', data: [30, 10, 20, 15, 25], colors: ['#FF9F40','#4BC0C0','#FF6384','#36A2EB','#9966FF'] },
+      { id: 'electricTricyclesChart', data: [25, 25, 20, 10, 20], colors: ['#36A2EB','#FFCE56','#FF6384','#4BC0C0','#FF9F40'] },
+      { id: 'electricBikesChart', data: [20, 20, 20, 20, 20], colors: ['#9966FF','#FF6384','#36A2EB','#FFCE56','#4BC0C0'] },
+      { id: 'electricCarsChart', data: [15, 25, 20, 15, 25], colors: ['#FFCE56','#FF6384','#4BC0C0','#36A2EB','#FF9F40'] }
+    ];
+
+    chartsConfig.forEach(cfg => {
+      const ctx = document.getElementById(cfg.id);
+      if (ctx) {
+        new Chart(ctx, {
+          type: 'doughnut',
+          data: { datasets: [{ data: cfg.data, backgroundColor: cfg.colors, borderWidth: 0 }] },
+          options: chartOptions
+        });
+      }
+    });
+  }
+
+  // ================= Nested Filters =================
+  function initNestedFilters() {
+    const filterDropdowns = document.querySelectorAll('.nested-filter-dropdown');
+    const allDropdowns = Array.from(filterDropdowns);
+
+    function closeAllDropdowns(except) {
+      allDropdowns.forEach(dd => { if (dd !== except) dd.classList.remove('active'); });
+    }
+
+    allDropdowns.forEach(dropdown => {
+      const select = dropdown.querySelector('.nested-filter-select');
+      const options = dropdown.querySelectorAll('.nested-filter-option');
+
+      // Toggle dropdown
+      select.addEventListener('click', function(e) {
+        e.stopPropagation();
+        closeAllDropdowns(dropdown);
+        dropdown.classList.toggle('active');
+      });
+
+      // Option selection
+      options.forEach(option => {
+        option.addEventListener('click', function(e) {
+          e.stopPropagation();
+          select.textContent = this.textContent;
+          options.forEach(opt => opt.classList.remove('active'));
+          this.classList.add('active');
+          setTimeout(() => dropdown.classList.remove('active'), 50);
+          updateFilterVisibility();
+          updateEmissionData();
+        });
+      });
+    });
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.nested-filter-dropdown')) {
+        allDropdowns.forEach(dd => dd.classList.remove('active'));
+      }
+    });
+
+    updateFilterVisibility(); // Initialize
+  }
+
+  // ================= Filter Visibility =================
+  function updateFilterVisibility() {
+    const selectedPeriod = document.querySelector('#period-filter .nested-filter-select').textContent.trim().toLowerCase();
+    const dayFilter = document.getElementById('day-filter');
+    const weekFilter = document.getElementById('week-filter');
+    const monthFilter = document.getElementById('month-filter');
+    const yearFilter = document.getElementById('year-filter');
+
+    dayFilter.style.display = 'none';
+    weekFilter.style.display = 'none';
+    monthFilter.style.display = 'none';
+    yearFilter.style.display = 'none';
+
+    switch (selectedPeriod) {
+      case 'daily':
+        dayFilter.style.display = 'inline-block';
+        monthFilter.style.display = 'inline-block';
+        yearFilter.style.display = 'inline-block';
+        break;
+      case 'weekly':
+        weekFilter.style.display = 'inline-block';
+        monthFilter.style.display = 'inline-block';
+        yearFilter.style.display = 'inline-block';
+        break;
+      case 'monthly':
+      case 'quarterly':
+        monthFilter.style.display = 'inline-block';
+        yearFilter.style.display = 'inline-block';
+        break;
+      case 'yearly':
+        yearFilter.style.display = 'inline-block';
+        break;
+      default:
+        dayFilter.style.display = 'inline-block';
+        weekFilter.style.display = 'inline-block';
+        monthFilter.style.display = 'inline-block';
+        yearFilter.style.display = 'inline-block';
+    }
+  }
+
+  // ================= Update Emission Data =================
+  function updateEmissionData() {
+    const period = document.querySelector('#period-filter .nested-filter-select')?.textContent.trim().toLowerCase() || null;
+    const day = document.querySelector('#day-filter .nested-filter-select')?.textContent.trim() || null;
+    const week = document.querySelector('#week-filter .nested-filter-select')?.textContent.trim() || null;
+    const month = document.querySelector('#month-filter .nested-filter-select')?.textContent.trim() || null;
+    const year = document.querySelector('#year-filter .nested-filter-select')?.textContent.trim() || null;
+
+    console.log('Filters -> period:', period, 'day:', day, 'week:', week, 'month:', month, 'year:', year);
+
+    // TODO: Fetch and update chart data based on selected filters
+  }
+
+  // ================= Initialize =================
+  initEmissionCharts();
+  initNestedFilters();
+});
+</script>
+
+
+</body>
+</html>
